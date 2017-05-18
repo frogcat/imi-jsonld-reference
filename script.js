@@ -1,131 +1,77 @@
-function Resource(json) {
-  this.json = json;
-  this.id = json["@id"];
-  this.compact = this.id.replace(/.*#/, "");
-  this.label = this.val("http://www.w3.org/2000/01/rdf-schema#label");
-  this.comment = this.val("http://www.w3.org/2000/01/rdf-schema#comment");
-  Resource.map[this.id] = this;
-  Resource.list.push(this);
-}
-Resource.map = {};
-Resource.list = [];
+function format(flat) {
 
-Resource.prototype = {
-  properties: function() {
-    var clazz = this.id;
-    return Resource.list.filter(function(a) {
-      return a.domainIncludes(clazz);
-    });
-  },
-  cardinality: function(property) {
-    var v = this.restriction().find(function(a) {
-      return (a.json["http://www.w3.org/2002/07/owl#onProperty"] || []).find(function(b) {
-        return b["@id"] === property;
-      });
-    });
-    if (v && v.json["http://www.w3.org/2002/07/owl#maxQualifiedCardinality"])
-      return 1;
-    if (v && v.json["http://www.w3.org/2002/07/owl#maxCardinality"])
-      return 1;
-    return NaN;
-  },
-  subClassOf: function() {
-    return (this.json["http://www.w3.org/2000/01/rdf-schema#subClassOf"] || []).map(function(a) {
-      return Resource.map[a["@id"]];
-    });
-  },
-  domainIncludes: function(clazz) {
-    var di = this.json["http://schema.org/domainIncludes"];
-    if (!di) return false;
-    return !!(di.find(function(a) {
-      return a["@id"] === clazz;
-    }));
-  },
-  is: function(clazz) {
-    return this.json["@type"] && this.json["@type"].find(function(a) {
-      return a === clazz;
-    });
-  },
-  parent: function() {
-    return this.subClassOf().find(function(a) {
-      return a.id.indexOf("http://") === 0;
-    });
-  },
-  children: function() {
-    var that = this;
-    return Resource.list.filter(function(a) {
-      return a.parent() === that;
-    });
-  },
-  restriction: function() {
-    return this.subClassOf().filter(function(a) {
-      return a.is("http://www.w3.org/2002/07/owl#Restriction");
-    });
-  },
-  val: function(property) {
-    var v = null;
-    (this.json[property] || []).forEach(function(a) {
-      if (a instanceof String) v = a;
-      if (a["@language"]) {
-        if (a["@language"] === "ja") v = a["@value"]
-      } else if (a["@value"]) v = a["@value"];
-      else if (a["@id"]) v = a["@id"];
-    });
-    return v;
-  },
-  instance: function(useArray) {
-    var json = this.parent() ? this.parent().instance(useArray) : {
-      "@context": "http://imi.go.jp/ns/core/context.jsonld"
+  var map = {};
+  flat.forEach(function(a) {
+    map[a["@id"]] = a;
+  });
+
+  var ontology = {};
+
+  (function(a) {
+    ontology.version = a["http://www.w3.org/2002/07/owl#versionInfo"][0]["@value"];
+    ontology.label = a["http://www.w3.org/2000/01/rdf-schema#label"].find(function(a) {
+      return a["@language"] === "ja";
+    })["@value"];
+    ontology.comment = a["http://www.w3.org/2000/01/rdf-schema#comment"].find(function(a) {
+      return a["@language"] === "ja";
+    })["@value"];
+  })(map["http://imi.go.jp/ns/core/rdf"]);
+
+  var dig = function(id) {
+    var a = map[id];
+    var json = {
+      id: id,
+      label: a["http://www.w3.org/2000/01/rdf-schema#label"].find(function(a) {
+        return a["@language"] === "ja";
+      })["@value"],
+      comment: a["http://www.w3.org/2000/01/rdf-schema#comment"].find(function(a) {
+        return a["@language"] === "ja";
+      })["@value"]
     };
-    json["@type"] = this.compact;
 
-    var that = this;
-
-    this.properties().forEach(function(v) {
-      var range = v.val("http://www.w3.org/2000/01/rdf-schema#range");
-      var value = null;
-      switch (range) {
-        case "http://www.w3.org/2001/XMLSchema#string":
-          value = "文字列";
-          break;
-        case "http://www.w3.org/2002/07/owl#Thing":
-          value = "http://example.org/";
-          break;
-        case "http://www.w3.org/2001/XMLSchema#integer":
-          value = 1234567890;
-          break;
-        case "http://www.w3.org/2001/XMLSchema#nonNegativeInteger":
-          value = 1234567890;
-          break;
-        case "http://www.w3.org/2001/XMLSchema#date":
-          value = "2017-05-11";
-          break;
-        case "http://www.w3.org/2001/XMLSchema#time":
-          value = "00:00:00";
-          break;
-        case "http://www.w3.org/2001/XMLSchema#dateTime":
-          value = "2017-05-11T00:00:00";
-          break;
-        case "http://www.w3.org/2001/XMLSchema#decimal":
-          value = 1234.56789;
-          break;
-        case "http://www.w3.org/2001/XMLSchema#double":
-          value = 10.0e25;
-          break;
-        case "urn:un:unece:uncefact:codelist:standard:ISO:ISO3AlphaCurrencyCode:2012-08-31#ISO3AlphaCurrencyCodeContentType":
-          value = "YEN";
-          break;
-        default:
-          if (!Resource.map[range]) console.log(range);
-          value = {
-            "@type": Resource.map[range] ? Resource.map[range].compact : range
-          };
-          break;
-      }
-      json[v.compact] = (useArray && isNaN(that.cardinality(v.id))) ? [value] : value;
+    json.children = flat.filter(function(a) {
+      return (a["http://www.w3.org/2000/01/rdf-schema#subClassOf"] || []).find(function(b) {
+        return b["@id"] === id;
+      });
+    }).map(function(a) {
+      return dig(a["@id"]);
     });
+
+    json.properties = (a["http://www.w3.org/2000/01/rdf-schema#subClassOf"] || []).filter(function(b) {
+      return b["@id"].indexOf("_:") === 0;
+    }).map(function(b) {
+      return map[b["@id"]];
+    }).map(function(b) {
+      var id = b["http://www.w3.org/2002/07/owl#onProperty"][0]["@id"];
+      var prop = {
+        id: id,
+        min: 0,
+        range: map[id]["http://www.w3.org/2000/01/rdf-schema#range"][0]["@id"]
+      };
+      if (b["http://www.w3.org/2002/07/owl#maxQualifiedCardinality"]) prop.max = 1;
+      if (b["http://www.w3.org/2002/07/owl#maxCardinality"]) prop.max = 1;
+      return prop;
+    });
+
     return json;
-  }
+  };
+
+  ontology.root = dig("http://imi.go.jp/ns/core/rdf#概念型");
+
+  return ontology;
+}
+
+var defaultInstance = {
+  "http://www.w3.org/2001/XMLSchema#string": "文字列",
+  "http://www.w3.org/2002/07/owl#Thing": "http://example.org/",
+  "http://www.w3.org/2001/XMLSchema#integer": 1234567890,
+  "http://www.w3.org/2001/XMLSchema#nonNegativeInteger": 1234567890,
+  "http://www.w3.org/2001/XMLSchema#date": "2017-05-11",
+  "http://www.w3.org/2001/XMLSchema#time": "00:00:00",
+  "http://www.w3.org/2001/XMLSchema#dateTime": "2017-05-11T00:00:00",
+  "http://www.w3.org/2001/XMLSchema#decimal": 1234.56789,
+  "http://www.w3.org/2001/XMLSchema#double": 10.0e25,
+  "urn:un:unece:uncefact:codelist:standard:ISO:ISO3AlphaCurrencyCode:2012-08-31#ISO3AlphaCurrencyCodeContentType": "YEN"
 };
 
 fetch("https://imi.go.jp/ns/core/rdf.jsonld").then(function(a) {
@@ -133,28 +79,22 @@ fetch("https://imi.go.jp/ns/core/rdf.jsonld").then(function(a) {
 }).then(function(json) {
   return new Promise(function(resolve, reject) {
     jsonld.flatten(json, function(err, flat) {
-      resolve(flat.map(function(a) {
-        return new Resource(a);
-      }));
+      resolve(format(flat));
     });
   });
-}).then(function(resources) {
+}).then(function(ontology) {
+  console.log(ontology);
 
-  resources.filter(function(a) {
-    return a.is("http://www.w3.org/2002/07/owl#Ontology");
-  }).forEach(function(a) {
-    $("#version").text(a.val("http://www.w3.org/2002/07/owl#versionInfo"));
-  });
+  $("#version").text(ontology.version);
 
-  var render = function(a, depth) {
+  var render = function(anc) {
+    var a = anc[anc.length - 1];
     var div = $("<div class='clazz'/>");
     div.attr("id", a.label);
 
-    $("#menu>ul").append($("<li/>").css("text-indent", depth + "em").append(
+    $("#menu>ul").append($("<li/>").css("text-indent", (anc.length - 1) + "em").append(
       $("<a/>").attr("href", "#" + a.label).text(a.label)));
 
-    var anc = [];
-    for (var f = a; f; f = f.parent()) anc.unshift(f);
     var ul = $("<ul/>").appendTo(div);
     anc.forEach(function(v, i) {
       var a = $("<a/>").attr("href", "#" + v.label).text(v.label);
@@ -162,31 +102,42 @@ fetch("https://imi.go.jp/ns/core/rdf.jsonld").then(function(a) {
       ul.append($("<li/>").append(a));
     });
     div.append($("<p/>").text(a.comment));
-    div.append($("<pre/>").text(JSON.stringify(a.instance(false), null, "  ")));
-    div.append($("<button>配列のon/off</button>").attr("value", a.id));
-    $("#container").append(div);
 
-    a.children().forEach(function(v) {
-      render(v, depth + 1);
+    var compact = function(v) {
+      return v.replace(/.*#/, "");
+    };
+
+    var instance1 = {
+      "@context": "http://imi.go.jp/ns/core/context.jsonld"
+    };
+    var instance2 = {
+      "@context": "http://imi.go.jp/ns/core/context.jsonld"
+    };
+    anc.forEach(function(v) {
+      instance1["@type"] = compact(v.id);
+      instance2["@type"] = compact(v.id);
+      v.properties.forEach(function(w) {
+        var val = defaultInstance[w.range] || {
+          "@type": compact(w.range)
+        };
+        instance1[compact(w.id)] = w.max === 1 ? val : [val];
+        instance2[compact(w.id)] = val;
+      });
     });
 
+    div.append($("<button>配列あり</button>").attr("value", JSON.stringify(instance1, null, "  ")));
+    div.append($("<button>配列なし</button>").attr("value", JSON.stringify(instance2, null, "  ")));
+    div.append($("<pre/>").text(JSON.stringify(instance2, null, "  ")));
+    $("#container").append(div);
+
+    a.children.forEach(function(v) {
+      render(anc.concat(v));
+    });
   };
 
-  render(resources.find(function(a) {
-    return a.id === "http://imi.go.jp/ns/core/rdf#概念型";
-  }), 0);
+  render([ontology.root]);
 
-  $("button").on("click", function() {
-    var button = $(this);
-    var pre = $(this).parent().find("pre");
-    var a = Resource.map[button.attr("value")];
-    if (button.is(".on")) {
-      button.removeClass("on");
-      pre.text(JSON.stringify(a.instance(false), null, "  "));
-    } else {
-      button.addClass("on");
-      pre.text(JSON.stringify(a.instance(true), null, "  "));
-    }
+  $("button").click(function() {
+    $(this).parent().find("pre").text($(this).val());
   });
-
 });
