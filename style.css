@@ -1,0 +1,53 @@
+body {
+  color: #222;
+}
+
+dt {
+  font-weight: bold;
+}
+
+div.clazz ul {
+  margin: 0;
+  padding: 0;
+}
+
+div.clazz li {
+  display: inline;
+}
+
+div.clazz li+li::before {
+  content: ' > ';
+}
+
+pre {
+  background: white;
+  padding: 10px;
+  margin: 10px;
+}
+
+div#container {
+  margin-left: 200px;
+  max-width: 800px;
+}
+
+div.clazz {
+  background: #7FCFE2;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 1em;
+}
+
+#menu {
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  height: 100%;
+  width: auto;
+  overflow-y: auto;
+}
+
+#menu ul {
+  margin: 10px;
+  padding: 0;
+  font-size: 8pt;
+}
