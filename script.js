@@ -127,7 +127,7 @@ fetch("https://imi.go.jp/ns/core/rdf.jsonld").then(function(a) {
 
     div.append($("<button>配列あり</button>").attr("value", JSON.stringify(instance1, null, "  ")));
     div.append($("<button>配列なし</button>").attr("value", JSON.stringify(instance2, null, "  ")));
-    div.append($("<pre/>").text(JSON.stringify(instance2, null, "  ")));
+    div.append($("<pre contentEditable='true'/>").text(JSON.stringify(instance2, null, "  ")));
     $("#container").append(div);
 
     a.children.forEach(function(v) {
