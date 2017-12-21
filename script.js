@@ -108,10 +108,10 @@ fetch("https://imi.go.jp/ns/core/rdf.jsonld").then(function(a) {
     };
 
     var instance1 = {
-      "@context": "http://imi.go.jp/ns/core/context.jsonld"
+      "@context": "https://imi.go.jp/ns/core/context.jsonld"
     };
     var instance2 = {
-      "@context": "http://imi.go.jp/ns/core/context.jsonld"
+      "@context": "https://imi.go.jp/ns/core/context.jsonld"
     };
     anc.forEach(function(v) {
       instance1["@type"] = compact(v.id);
